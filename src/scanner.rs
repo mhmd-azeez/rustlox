@@ -8,31 +8,56 @@ pub struct Scanner<'a> {
 pub struct Token {
     pub token_type: TokenType,
     pub lexeme: String,
-    pub line: i32
+    pub line: i32,
 }
 
 #[derive(PartialEq, Debug)]
 pub enum TokenType {
     // Single-character tokens.
-    LeftParen, RightParen,
-    LeftBrace, RightBrace,
-    Comma, Dot, Minus, Plus,
-    Semicolon, Slash, Star,
+    LeftParen,
+    RightParen,
+    LeftBrace,
+    RightBrace,
+    Comma,
+    Dot,
+    Minus,
+    Plus,
+    Semicolon,
+    Slash,
+    Star,
     // One or two character tokens.
-    Bang, BangEqual,
-    Equal, EqualEqual,
-    Greater, GreaterEqual,
-    Less, LessEqual,
+    Bang,
+    BangEqual,
+    Equal,
+    EqualEqual,
+    Greater,
+    GreaterEqual,
+    Less,
+    LessEqual,
     // Literals.
-    Identifier, String, Number,
+    Identifier,
+    String,
+    Number,
     // Keywords.
-    And, Class, Else, False,
-    For, Fun, If, Nil, Or,
-    Print, Return, Super, This,
-    True, Var, While,
-    Error, EOF,
+    And,
+    Class,
+    Else,
+    False,
+    For,
+    Fun,
+    If,
+    Nil,
+    Or,
+    Print,
+    Return,
+    Super,
+    This,
+    True,
+    Var,
+    While,
+    Error,
+    EOF,
 }
-
 
 impl<'a> Scanner<'a> {
     pub fn new(source: &Vec<char>) -> Scanner {
@@ -41,10 +66,12 @@ impl<'a> Scanner<'a> {
             start: 0,
             current: 0,
             line: 1,
-        }
+        };
     }
 
     pub fn scan_token(&mut self) -> Token {
+        self.skip_whitespace();
+
         self.start = self.current;
 
         if self.is_at_end() {
@@ -65,6 +92,34 @@ impl<'a> Scanner<'a> {
             '+' => self.make_token(TokenType::Plus),
             '/' => self.make_token(TokenType::Slash),
             '*' => self.make_token(TokenType::Star),
+            '!' => {
+                if self.match_char('=') {
+                    self.make_token(TokenType::BangEqual)
+                } else {
+                    self.make_token(TokenType::Bang)
+                }
+            }
+            '=' => {
+                if self.match_char('=') {
+                    self.make_token(TokenType::EqualEqual)
+                } else {
+                    self.make_token(TokenType::Equal)
+                }
+            }
+            '<' => {
+                if self.match_char('=') {
+                    self.make_token(TokenType::LessEqual)
+                } else {
+                    self.make_token(TokenType::Less)
+                }
+            }
+            '>' => {
+                if self.match_char('=') {
+                    self.make_token(TokenType::GreaterEqual)
+                } else {
+                    self.make_token(TokenType::Greater)
+                }
+            }
             _ => panic!("Invalid character"),
         };
 
@@ -80,7 +135,7 @@ impl<'a> Scanner<'a> {
             token_type: token_type,
             lexeme: self.source[self.start..=self.current].iter().collect(),
             line: self.line,
-        }
+        };
     }
 
     fn error_token(&self, message: &str) -> Token {
@@ -88,11 +143,59 @@ impl<'a> Scanner<'a> {
             token_type: TokenType::Error,
             lexeme: message.to_string(),
             line: self.line,
-        }
+        };
     }
 
     fn advance(&mut self) -> char {
         self.current += 1;
         return self.source[self.current - 1];
     }
+
+    fn match_char(&mut self, expected: char) -> bool {
+        if self.is_at_end() {
+            return false;
+        }
+
+        if self.source[self.current] != expected {
+            return false;
+        }
+
+        self.current += 1;
+        return true;
+    }
+
+    fn skip_whitespace(&mut self) {
+        loop {
+            let c = self.peek();
+            match c {
+                ' ' | '\r' | '\t' => {
+                    self.advance();
+                },
+                '\n' => {
+                    self.line += 1;
+                    self.advance();
+                },
+                '/' => {
+                    if self.peek_next() == '/' {
+                        while self.peek() != '\n' && !self.is_at_end() {
+                             self.advance();
+                        }
+                    }
+                }
+                _ => return
+            }
+        }
+    }
+
+    fn peek(&self) -> char {
+        return self.source[self.current];
+    }
+
+    fn peek_next(&self) -> char {
+        if self.is_at_end() {
+            return '\0';
+        }
+
+        return self.source[self.current + 1];
+      }
 }
