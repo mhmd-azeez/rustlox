@@ -7,6 +7,8 @@ use crate::vm::VM;
 mod chunk;
 mod debug;
 mod vm;
+mod compiler;
+mod scanner;
 
 fn main() -> Result<(), i32> {
     println!("Hello, world!");

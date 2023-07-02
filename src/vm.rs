@@ -1,4 +1,4 @@
-use crate::{chunk::{Chunk, OpCode, Value}, debug};
+use crate::{chunk::{Chunk, OpCode, Value}, debug, compiler};
 use num_traits::FromPrimitive;
 
 pub struct VM {
@@ -38,20 +38,20 @@ impl VM {
             let instruction = OpCode::from_u8(self.read_byte(chunk));
             match instruction {
                 Some(value) => match value {
-                    OpCode::OpConstant => {
+                    OpCode::Constant => {
                         let index = self.read_byte(chunk);
                         let constant = chunk.read_constant(index);
                         self.push(constant);
                     }
-                    OpCode::OpAdd => self.binary_op(|a, b| a + b),
-                    OpCode::OpSubtract => self.binary_op(|a, b| a - b),
-                    OpCode::OpMultiply => self.binary_op(|a, b| a * b),
-                    OpCode::OpDivide => self.binary_op(|a, b| a / b),
-                    OpCode::OpNegate => {
+                    OpCode::Add => self.binary_op(|a, b| a + b),
+                    OpCode::Subtract => self.binary_op(|a, b| a - b),
+                    OpCode::Multiply => self.binary_op(|a, b| a * b),
+                    OpCode::Divide => self.binary_op(|a, b| a / b),
+                    OpCode::Negate => {
                         let value = self.pop();
                         self.push(-value);
                     }
-                    OpCode::OpReturn => {
+                    OpCode::Return => {
                         debug::print_value(self.pop());
                         println!();
                         return InterpretResult::Ok;
