@@ -1,7 +1,9 @@
 use crate::chunk::Chunk; 
 use crate::chunk::OpCode;
+use crate::vm::VM;
 mod chunk;
 mod debug;
+mod vm;
 
 fn main() {
     println!("Hello, world!");
@@ -13,14 +15,6 @@ fn main() {
 
     chunk.write(OpCode::OpReturn as u8, 123);
 
-    disassemble_chunk(&chunk, "test chunk");
-}
-
-fn disassemble_chunk(chunk: &Chunk, name: &str) {
-    println!("== {} ==\n", name);
-
-    let mut offset = 0;
-    while offset < chunk.code.len() {
-        offset = debug::disassemble_instruction(chunk, offset);
-    }
+    let vm = VM::new(chunk);
+    vm.intepret();
 }
