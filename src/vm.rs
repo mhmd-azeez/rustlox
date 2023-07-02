@@ -40,16 +40,20 @@ impl VM {
             let instruction = OpCode::from_u8(self.read_byte());
             match instruction {
                 Some(value) => match value {
+                    OpCode::OpConstant => {
+                        let index = self.read_byte();
+                        let constant = self.read_constant(index);
+                        self.push(constant);
+                    },
+                    OpCode::OpNegate => {
+                        let value = self.pop();
+                        self.push(-value);
+                    }
                     OpCode::OpReturn => {
                         debug::print_value(self.pop());
                         println!();
                         return InterpretResult::Ok;
                     },
-                    OpCode::OpConstant => {
-                        let index = self.read_byte();
-                        let constant = self.read_constant(index);
-                        self.push(constant);
-                    }
                 },
                 None => return InterpretResult::RuntimeError,
             }

@@ -5,6 +5,7 @@ pub type Value = f64;
 #[derive(Debug, PartialEq, FromPrimitive)]
 pub enum OpCode {
     OpConstant,
+    OpNegate,
     OpReturn
 }
 
