@@ -45,6 +45,10 @@ impl VM {
                         let constant = self.read_constant(index);
                         self.push(constant);
                     },
+                    OpCode::OpAdd => self.binary_op(|a, b| a + b),
+                    OpCode::OpSubtract => self.binary_op(|a, b| a - b),
+                    OpCode::OpMultiply => self.binary_op(|a, b| a * b),
+                    OpCode::OpDivide => self.binary_op(|a, b| a / b),
                     OpCode::OpNegate => {
                         let value = self.pop();
                         self.push(-value);
@@ -57,8 +61,13 @@ impl VM {
                 },
                 None => return InterpretResult::RuntimeError,
             }
-            
         }
+    }
+
+    fn binary_op<F>(&mut self, op: F) where F: Fn(Value, Value) -> Value {
+        let b = self.stack.pop().unwrap();
+        let a = self.stack.pop().unwrap();
+        self.stack.push(op(a, b));
     }
 
     pub fn push(&mut self, value: Value) {
