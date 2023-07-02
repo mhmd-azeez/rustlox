@@ -1,5 +1,5 @@
 pub struct Scanner<'a> {
-    source: &'a str,
+    source: &'a Vec<char>,
     start: usize,
     current: usize,
     line: i32,
@@ -11,7 +11,7 @@ pub struct Token {
     pub line: i32
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(PartialEq, Debug)]
 pub enum TokenType {
     // Single-character tokens.
     LeftParen, RightParen,
@@ -35,7 +35,7 @@ pub enum TokenType {
 
 
 impl<'a> Scanner<'a> {
-    pub fn new(source: &'a str) -> Scanner<'a> {
+    pub fn new(source: &Vec<char>) -> Scanner {
         return Scanner {
             source: source,
             start: 0,
@@ -44,7 +44,7 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    pub fn scan_token(mut self) -> Token {
+    pub fn scan_token(&mut self) -> Token {
         self.start = self.current;
 
         if self.is_at_end() {
@@ -78,7 +78,7 @@ impl<'a> Scanner<'a> {
     fn make_token(&self, token_type: TokenType) -> Token {
         return Token {
             token_type: token_type,
-            lexeme: self.source.get(self.start..self.current).unwrap().to_string(),
+            lexeme: self.source[self.start..=self.current].iter().collect(),
             line: self.line,
         }
     }
@@ -91,8 +91,8 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    fn advance(&self) -> char {
+    fn advance(&mut self) -> char {
         self.current += 1;
-        return self.source.get(self.current - 1).unwrap();
+        return self.source[self.current - 1];
     }
 }

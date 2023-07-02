@@ -1,4 +1,7 @@
-use crate::{chunk::{Chunk, OpCode, Value}, debug, compiler};
+use crate::{
+    chunk::{Chunk, OpCode, Value},
+    compiler, debug,
+};
 use num_traits::FromPrimitive;
 
 pub struct VM {
@@ -21,7 +24,12 @@ impl VM {
         }
     }
 
-    pub fn interpret(&mut self, chunk: &Chunk) -> InterpretResult {
+    pub fn interpret(&mut self, source: Vec<char>) -> InterpretResult {
+        compiler::compile(&source);
+        return InterpretResult::Ok;
+    }
+
+    pub fn interpret_chunk(&mut self, chunk: &Chunk) -> InterpretResult {
         loop {
             print!("          ");
 

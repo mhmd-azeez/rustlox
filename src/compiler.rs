@@ -1,7 +1,7 @@
 use crate::scanner::{Scanner, TokenType};
 
-pub fn compile(source: &str) {
-    let scanner = Scanner::new(source);
+pub fn compile(source: &Vec<char>) {
+    let mut scanner = Scanner::new(source);
 
     let mut line = -1;
     loop {

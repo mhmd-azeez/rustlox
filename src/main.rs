@@ -69,20 +69,20 @@ fn run_file(path: &str) -> Result<(), i32> {
     };
 }
 
-fn interpret(vm: &mut VM, line: String) -> InterpretResult {
-    todo!();
+fn interpret(vm: &mut VM, source: Vec<char>) -> InterpretResult {
+   return vm.interpret(source);
 }
 
-fn read_line() -> Result<String, io::Error> {
+fn read_line() -> Result<Vec<char>, io::Error> {
     let stdin = io::stdin();
     let mut buffer = String::new();
     stdin.lock().read_line(&mut buffer)?;
-    Ok(buffer)
+    Ok(buffer.chars().collect())
 }
 
-fn read_file(file_path: &str) -> Result<String, io::Error> {
+fn read_file(file_path: &str) -> Result<Vec<char>, io::Error> {
     let mut file = File::open(file_path)?;
     let mut buffer = String::new();
     file.read_to_string(&mut buffer)?;
-    Ok(buffer)
+    Ok(buffer.chars().collect())
 }
