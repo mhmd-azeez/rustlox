@@ -1,34 +1,86 @@
-use crate::chunk::Chunk; 
-use crate::chunk::OpCode;
+use std::env;
+use std::fs::File;
+use std::io::{self, BufRead, Read};
+use vm::InterpretResult;
+
 use crate::vm::VM;
 mod chunk;
 mod debug;
 mod vm;
 
-fn main() {
+fn main() -> Result<(), i32> {
     println!("Hello, world!");
-    let mut chunk : Chunk = Chunk::new();
 
-    let constant = chunk.add_constant(1.2);
-    chunk.write(OpCode::OpConstant as u8, 123);
-    chunk.write(constant, 123);
+    let args: Vec<String> = env::args().collect();
 
-    let constant = chunk.add_constant(3.4);
-    chunk.write(OpCode::OpConstant as u8, 123);
-    chunk.write(constant, 123);
+    match args.len() {
+        1 => return repl(),
+        2 => return run_file(&args[1]),
+        _ => {
+            println!("Usage: rustlox [path]");
+            return Err(64);
+        }
+    }
+}
 
-    chunk.write(OpCode::OpAdd as u8, 123);
+fn repl() -> Result<(), i32> {
+    let mut vm = VM::new();
 
-    let constant = chunk.add_constant(5.6);
-    chunk.write(OpCode::OpConstant as u8, 123);
-    chunk.write(constant, 123);
+    loop {
+        let result = read_line();
+        match result {
+            Ok(line) => {
+                if line.len() == 0 {
+                    println!("bye!");
+                    break;
+                } else {
+                    interpret(&mut vm, line);
+                }
+            }
+            Err(err) => {
+                println!("Invalid input: {}", err);
+                break;
+            }
+        }
+    }
 
-    chunk.write(OpCode::OpDivide as u8, 123);
+    return Ok(());
+}
 
-    chunk.write(OpCode::OpNegate as u8, 123);
+fn run_file(path: &str) -> Result<(), i32> {
+    let mut vm = VM::new();
 
-    chunk.write(OpCode::OpReturn as u8, 123);
+    let result = read_file(path);
+    match result {
+        Ok(line) => {
+            let result = interpret(&mut vm, line);
+            match result {
+                InterpretResult::CompileError => return Err(65),
+                InterpretResult::RuntimeError => return Err(70),
+                InterpretResult::Ok => return Ok(()),
+            };
+        }
+        Err(err) => {
+            println!("Could not open file '{}': {}", path, err);
+            return Err(74);
+        }
+    };
+}
 
-    let vm = VM::new(chunk);
-    vm.intepret();
+fn interpret(vm: &mut VM, line: String) -> InterpretResult {
+    todo!();
+}
+
+fn read_line() -> Result<String, io::Error> {
+    let stdin = io::stdin();
+    let mut buffer = String::new();
+    stdin.lock().read_line(&mut buffer)?;
+    Ok(buffer)
+}
+
+fn read_file(file_path: &str) -> Result<String, io::Error> {
+    let mut file = File::open(file_path)?;
+    let mut buffer = String::new();
+    file.read_to_string(&mut buffer)?;
+    Ok(buffer)
 }

@@ -37,5 +37,9 @@ impl Chunk {
         self.constants.push(value);
         return (self.constants.len() - 1) as u8;
     }
+
+    pub fn read_constant(&self, index: u8) -> Value {
+        return self.constants[index as usize];
+    }
 }
 
