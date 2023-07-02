@@ -119,7 +119,9 @@ impl<'a> Scanner<'a> {
                 } else {
                     self.make_token(TokenType::Greater)
                 }
-            }
+            },
+            '"' => self.make_string(),
+            d if self.is_digit(c) => self.make_number(),
             _ => panic!("Invalid character"),
         };
 
@@ -198,4 +200,42 @@ impl<'a> Scanner<'a> {
 
         return self.source[self.current + 1];
       }
+
+    fn make_string(&mut self) -> Token {
+        while self.peek() != '"' && !self.is_at_end() {
+            if self.peek() == '\n' {
+                self.line += 1;
+            }
+
+            self.advance();
+        }
+
+        if self.is_at_end() {
+            return self.error_token("Unterminated string.");
+        }
+
+        self.advance();
+        return self.make_token(TokenType::String);
+    }
+
+    fn is_digit(&self, c: char) -> bool {
+        return c >= '0' && c <= '9';
+    }
+
+    fn make_number(&mut self) -> Token {
+        while self.is_digit(self.peek()) {
+            self.advance();
+        }
+
+        // Look for a fractional part
+        if self.peek() == '.' && self.is_digit(self.peek_next()) {
+            // Consume the '.'
+            self.advance();
+            while self.is_digit(self.peek()) {
+                self.advance();
+            }
+        }
+
+        return self.make_token(TokenType::Number);
+    }
 }
