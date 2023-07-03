@@ -117,8 +117,14 @@ impl<'a> Parser<'a> {
     }
 
     fn number(&mut self) {
-        let value: Value = self.previous.lexeme.parse::<f64>().unwrap();
-        self.emit_constant(value);
+        let result = self.previous.lexeme.parse::<f64>();
+        match result {
+            Ok(value) => self.emit_constant(value),
+            Err(err) => {
+                println!("Failed to parse number: {}. '{}'", err, lexeme);
+                panic!("Could not parse number.");
+            }, 
+        }
     }
 
     fn emit_constant(&mut self, value: Value) {

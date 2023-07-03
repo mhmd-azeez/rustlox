@@ -154,7 +154,7 @@ impl<'a> Scanner<'a> {
     fn make_token(&self, token_type: TokenType) -> Token {
         return Token {
             token_type: token_type,
-            lexeme: self.source[self.start..=self.current].iter().collect(),
+            lexeme: self.source[self.start..self.current].iter().collect(),
             line: self.line,
         };
     }
