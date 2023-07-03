@@ -58,8 +58,8 @@ impl<'a> Parser<'a> {
             if self.current.token_type != TokenType::Error {
                 return None;
             };
-            let err = self.error_at_current(&self.current.lexeme);
-            return Some(err);
+            let lexeme = &self.current.lexeme.clone();
+            return Some(self.error_at_current(lexeme));
         }
     }
 
@@ -76,24 +76,24 @@ impl<'a> Parser<'a> {
         self.parse_precendence(Precedence::Assignment);
     }
 
-    fn end_compiler(&self) {
+    fn end_compiler(&mut self) {
         self.emit_return();
     }
 
-    fn emit_byte(&self, byte: u8) {
+    fn emit_byte(&mut self, byte: u8) {
         self.chunk.write(byte, self.previous.line);
     }
 
-    fn emit_bytes(&self, byte1: u8, byte2: u8) {
+    fn emit_bytes(&mut self, byte1: u8, byte2: u8) {
         self.emit_byte(byte1);
         self.emit_byte(byte2);
     }
 
-    fn emit_return(&self) {
+    fn emit_return(&mut self) {
         self.emit_byte(OpCode::Return as u8);
     }
 
-    fn error_at_current(self, message: &str) -> String {
+    fn error_at_current(&mut self, message: &str) -> String {
         return Parser::error_at(&self.current, message);
     }
 
@@ -139,7 +139,7 @@ impl<'a> Parser<'a> {
         );
     }
 
-    fn unary(&self) {
+    fn unary(&mut self) {
         let operator_type = &self.previous.token_type;
 
         // Compile the operand.
@@ -152,7 +152,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn binary(&self) {
+    fn binary(&mut self) {
         let operator_type = &self.previous.token_type;
         let rule = self.get_rule(operator_type);
         self.parse_precendence(Precedence::from_u8((rule.precedence as u8) + 1).unwrap());
