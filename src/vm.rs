@@ -1,6 +1,6 @@
 use crate::{
     chunk::{Chunk, OpCode, Value},
-    compiler, debug,
+    compiler::{self, compile}, debug,
 };
 use num_traits::FromPrimitive;
 
@@ -25,11 +25,15 @@ impl VM {
     }
 
     pub fn interpret(&mut self, source: Vec<char>) -> InterpretResult {
-        compiler::compile(&source);
-        return InterpretResult::Ok;
+        let result = compile(&source);
+
+        return match result {
+            Some(chunk) => self.run(&chunk),
+            None => return InterpretResult::CompileError,
+        };
     }
 
-    pub fn interpret_chunk(&mut self, chunk: &Chunk) -> InterpretResult {
+    fn run(&mut self, chunk: &Chunk) -> InterpretResult {
         loop {
             print!("          ");
 

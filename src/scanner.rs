@@ -11,6 +11,16 @@ pub struct Token {
     pub line: i32,
 }
 
+impl Token {
+    pub fn empty() -> Token {
+        return Token {
+            token_type: TokenType::Error,
+            lexeme: "Empty token.".to_owned(),
+            line: -1,
+        };
+    }
+}
+
 #[derive(PartialEq, Debug)]
 pub enum TokenType {
     // Single-character tokens.
