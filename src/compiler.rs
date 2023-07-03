@@ -50,7 +50,7 @@ impl<'a> Parser<'a> {
     }
 
     fn advance(&mut self) -> Option<String> {
-        self.previous = self.current;
+        self.previous = self.current.clone();
 
         loop {
             self.current = self.scanner.scan_token();
@@ -58,7 +58,7 @@ impl<'a> Parser<'a> {
             if self.current.token_type != TokenType::Error {
                 return None;
             };
-            let err = self.error_at_current(self.current.lexeme);
+            let err = self.error_at_current(&self.current.lexeme);
             return Some(err);
         }
     }
@@ -69,15 +69,11 @@ impl<'a> Parser<'a> {
             return;
         }
 
-        self.error_at_current(message);
+        self.error_at_current(&message);
     }
 
     fn expression(&self) {
         self.parse_precendence(Precedence::Assignment);
-    }
-
-    fn current_chunk(&self) -> Chunk {
-        return self.chunk;
     }
 
     fn end_compiler(&self) {
@@ -85,7 +81,7 @@ impl<'a> Parser<'a> {
     }
 
     fn emit_byte(&self, byte: u8) {
-        self.current_chunk().write(byte, self.previous.line);
+        self.chunk.write(byte, self.previous.line);
     }
 
     fn emit_bytes(&self, byte1: u8, byte2: u8) {
@@ -97,15 +93,15 @@ impl<'a> Parser<'a> {
         self.emit_byte(OpCode::Return as u8);
     }
 
-    fn error_at_current(self, message: String) -> String {
+    fn error_at_current(self, message: &str) -> String {
         return Parser::error_at(&self.current, message);
     }
 
-    fn error(&mut self, message: String) -> String {
+    fn error(&mut self, message: &str) -> String {
         return Parser::error_at(&self.previous, message);
     }
 
-    fn error_at(token: &Token, message: String) -> String {
+    fn error_at(token: &Token, message: &str) -> String {
         let mut builder = Builder::default();
 
         builder.append(format!("[line {}] Error", token.line));
@@ -120,13 +116,19 @@ impl<'a> Parser<'a> {
         return  builder.string().unwrap();
     }
 
-    fn number(&self) {
+    fn number(&mut self) {
         let value: Value = self.previous.lexeme.parse::<f64>().unwrap();
         self.emit_constant(value);
     }
 
-    fn emit_constant(&self, value: Value) {
-        self.emit_bytes(OpCode::Constant as u8, self.make_constant(value));
+    fn emit_constant(&mut self, value: Value) {
+        let constant = self.chunk.add_constant(value);
+        if constant > u8::MAX {
+            self.error("Too many constants in one chunk.");
+            return;
+        }
+
+        self.emit_bytes(OpCode::Constant as u8, constant);
     }
 
     fn grouping(&mut self) {
@@ -157,24 +159,14 @@ impl<'a> Parser<'a> {
 
         match operator_type {
             TokenType::Plus => self.emit_byte(OpCode::Add as u8),
-            TokenType::Plus => self.emit_byte(OpCode::Add as u8),
-            TokenType::Plus => self.emit_byte(OpCode::Add as u8),
-            TokenType::Plus => self.emit_byte(OpCode::Add as u8),
+            TokenType::Minus => self.emit_byte(OpCode::Subtract as u8),
+            TokenType::Star => self.emit_byte(OpCode::Multiply as u8),
+            TokenType::Slash => self.emit_byte(OpCode::Divide as u8),
             _ => panic!("Unrecognized binary operator!"),
         }
     }
 
     fn parse_precendence(&self, precedence: Precedence) {}
-
-    fn make_constant(&mut self, value: Value) -> u8 {
-        let constant = self.current_chunk().add_constant(value);
-        if constant > u8::MAX {
-            self.error("Too many constants in one chunk.".to_owned());
-            return 0;
-        }
-
-        return constant;
-    }
 
     fn get_rule(&self, operator_type: &TokenType) -> ParseRule {
        // return rules[operator_type];
