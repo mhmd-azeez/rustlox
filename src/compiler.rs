@@ -1,25 +1,55 @@
+use std::collections::HashMap;
+use num_derive::FromPrimitive;
+use num_traits::FromPrimitive;
+
 use string_builder::Builder;
 
-use crate::{scanner::{Scanner, TokenType, Token}, chunk::{Chunk, OpCode}};
+use crate::{
+    chunk::{Chunk, OpCode, Value},
+    scanner::{Scanner, Token, TokenType},
+};
 
 struct Parser<'a> {
     current: Token,
     previous: Token,
     scanner: Scanner<'a>,
-    chunk: Chunk
+    chunk: Chunk,
+}
+
+#[derive(Debug, FromPrimitive)]
+enum Precedence {
+    None,
+    Assignment, // =
+    Or,         // or
+    And,        // and
+    Equality,   // == !=
+    Comparison, // < > <= >=
+    Term,       // + -
+    Factor,     // * /
+    Unary,      // ! -
+    Call,       // . ()
+    Primary,
+}
+
+type ParseFn = dyn Fn(&Parser) -> ();
+
+struct ParseRule {
+    prefix: Option<Box<ParseFn>>,
+    infix: Option<Box<ParseFn>>,
+    precedence: Precedence,
 }
 
 impl<'a> Parser<'a> {
-    fn new(scanner: Scanner<'a>) -> Parser<'a> {
-        return Parser{
+    fn new(source: &'a Vec<char>) -> Parser<'a> {
+        return Parser {
             current: Token::empty(),
             previous: Token::empty(),
-            scanner,
+            scanner: Scanner::new(source),
             chunk: Chunk::new(),
         };
     }
 
-    fn advance(&self) -> Option<String> {
+    fn advance(&mut self) -> Option<String> {
         self.previous = self.current;
 
         loop {
@@ -28,12 +58,12 @@ impl<'a> Parser<'a> {
             if self.current.token_type != TokenType::Error {
                 return None;
             };
-            
-            return Some(self.error_at_current(self.current.lexeme));
+            let err = self.error_at_current(self.current.lexeme);
+            return Some(err);
         }
     }
 
-    fn consume(&self, token_type: TokenType, message: String) {
+    fn consume(&mut self, token_type: TokenType, message: String) {
         if self.current.token_type == token_type {
             self.advance();
             return;
@@ -42,53 +72,118 @@ impl<'a> Parser<'a> {
         self.error_at_current(message);
     }
 
-    fn emitByte(&self, byte: u8) {
-        self.current_chunk().write(byte, self.previous.line);
-    }
-
-    fn emitBytes(&self, byte1: u8, byte2: u8) {
-        self.emitByte(byte1);
-        self.emitByte(byte2);
-    }
-
-    fn emit_return(&self) {
-        self.emitByte(OpCode::Return as u8);
+    fn expression(&self) {
+        self.parse_precendence(Precedence::Assignment);
     }
 
     fn current_chunk(&self) -> Chunk {
         return self.chunk;
     }
 
+    fn end_compiler(&self) {
+        self.emit_return();
+    }
+
+    fn emit_byte(&self, byte: u8) {
+        self.current_chunk().write(byte, self.previous.line);
+    }
+
+    fn emit_bytes(&self, byte1: u8, byte2: u8) {
+        self.emit_byte(byte1);
+        self.emit_byte(byte2);
+    }
+
+    fn emit_return(&self) {
+        self.emit_byte(OpCode::Return as u8);
+    }
+
     fn error_at_current(self, message: String) -> String {
-        return Parser::error_at(self.current, message);
+        return Parser::error_at(&self.current, message);
     }
 
-    fn error(self, message: String) -> String {
-        return Parser::error_at(self.previous, message);
+    fn error(&mut self, message: String) -> String {
+        return Parser::error_at(&self.previous, message);
     }
 
-    fn error_at(token: Token, message: String) -> String {
+    fn error_at(token: &Token, message: String) -> String {
         let mut builder = Builder::default();
 
         builder.append(format!("[line {}] Error", token.line));
 
         match token.token_type {
             TokenType::EOF => builder.append(" at end"),
-            TokenType::Error => {}, // Nothing
+            TokenType::Error => {} // Nothing
             _ => builder.append(format!(" at '{}'", token.lexeme)),
         }
 
-        builder.append(format!(": {}", message))
+        builder.append(format!(": {}", message));
+        return  builder.string().unwrap();
     }
 
-    fn end_compiler(&self) {
-        self.emit_return();
+    fn number(&self) {
+        let value: Value = self.previous.lexeme.parse::<f64>().unwrap();
+        self.emit_constant(value);
+    }
+
+    fn emit_constant(&self, value: Value) {
+        self.emit_bytes(OpCode::Constant as u8, self.make_constant(value));
+    }
+
+    fn grouping(&mut self) {
+        self.expression();
+        self.consume(
+            TokenType::RightParen,
+            "Expect ')' after expression.".to_owned(),
+        );
+    }
+
+    fn unary(&self) {
+        let operator_type = &self.previous.token_type;
+
+        // Compile the operand.
+        self.parse_precendence(Precedence::Unary);
+
+        // Emit the operator instruction.
+        match operator_type {
+            TokenType::Minus => self.emit_byte(OpCode::Negate as u8),
+            _ => panic!("Unrecognized unary operator!"),
+        }
+    }
+
+    fn binary(&self) {
+        let operator_type = &self.previous.token_type;
+        let rule = self.get_rule(operator_type);
+        self.parse_precendence(Precedence::from_u8((rule.precedence as u8) + 1).unwrap());
+
+        match operator_type {
+            TokenType::Plus => self.emit_byte(OpCode::Add as u8),
+            TokenType::Plus => self.emit_byte(OpCode::Add as u8),
+            TokenType::Plus => self.emit_byte(OpCode::Add as u8),
+            TokenType::Plus => self.emit_byte(OpCode::Add as u8),
+            _ => panic!("Unrecognized binary operator!"),
+        }
+    }
+
+    fn parse_precendence(&self, precedence: Precedence) {}
+
+    fn make_constant(&mut self, value: Value) -> u8 {
+        let constant = self.current_chunk().add_constant(value);
+        if constant > u8::MAX {
+            self.error("Too many constants in one chunk.".to_owned());
+            return 0;
+        }
+
+        return constant;
+    }
+
+    fn get_rule(&self, operator_type: &TokenType) -> ParseRule {
+       // return rules[operator_type];
+       todo!();
     }
 }
 
 pub fn compile(source: &Vec<char>) -> Option<Chunk> {
-    let mut scanner = Scanner::new(source);
-    let parser = Parser::new(scanner);
+    let mut parser = Parser::new(source);
 
     let result = parser.advance();
     if let Some(error) = result {
@@ -96,10 +191,334 @@ pub fn compile(source: &Vec<char>) -> Option<Chunk> {
         return None;
     }
 
-    expression();
+    parser.expression();
 
     parser.consume(TokenType::EOF, "Expect end of expression.".to_owned());
     parser.end_compiler();
 
     return Some(parser.chunk);
 }
+
+
+// const rules: HashMap<TokenType, ParseRule> = HashMap::from([
+//     (
+//         TokenType::LeftParen,
+//         ParseRule {
+//             prefix: Some(Box::new(Parser::grouping)),
+//             infix: None,
+//             precedence: Precedence::None,
+//         },
+//     ),
+//     (
+//         TokenType::RightParen,
+//         ParseRule {
+//             prefix: None,
+//             infix: None,
+//             precedence: Precedence::None,
+//         },
+//     ),
+//     (
+//         TokenType::LeftBrace,
+//         ParseRule {
+//             prefix: None,
+//             infix: None,
+//             precedence: Precedence::None,
+//         },
+//     ),
+//     (
+//         TokenType::RightBrace,
+//         ParseRule {
+//             prefix: None,
+//             infix: None,
+//             precedence: Precedence::None,
+//         },
+//     ),
+//     (
+//         TokenType::Comma,
+//         ParseRule {
+//             prefix: None,
+//             infix: None,
+//             precedence: Precedence::None,
+//         },
+//     ),
+//     (
+//         TokenType::Dot,
+//         ParseRule {
+//             prefix: None,
+//             infix: None,
+//             precedence: Precedence::None,
+//         },
+//     ),
+//     (
+//         TokenType::Minus,
+//         ParseRule {
+//             prefix: Some(Box::new(Parser::unary)),
+//             infix: Some(Box::new(Parser::binary)),
+//             precedence: Precedence::Term,
+//         },
+//     ),
+//     (
+//         TokenType::Plus,
+//         ParseRule {
+//             prefix: None,
+//             infix: Some(Box::new(Parser::binary)),
+//             precedence: Precedence::Term,
+//         },
+//     ),
+//     (
+//         TokenType::Semicolon,
+//         ParseRule {
+//             prefix: None,
+//             infix: None,
+//             precedence: Precedence::None,
+//         },
+//     ),
+//     (
+//         TokenType::Slash,
+//         ParseRule {
+//             prefix: None,
+//             infix: Some(Box::new(Parser::binary)),
+//             precedence: Precedence::Factor,
+//         },
+//     ),
+//     (
+//         TokenType::Star,
+//         ParseRule {
+//             prefix: None,
+//             infix: Some(Box::new(Parser::binary)),
+//             precedence: Precedence::Factor,
+//         },
+//     ),
+//     (
+//         TokenType::Bang,
+//         ParseRule {
+//             prefix: None,
+//             infix: None,
+//             precedence: Precedence::None,
+//         },
+//     ),
+//     (
+//         TokenType::BangEqual,
+//         ParseRule {
+//             prefix: None,
+//             infix: None,
+//             precedence: Precedence::None,
+//         },
+//     ),
+//     (
+//         TokenType::Equal,
+//         ParseRule {
+//             prefix: None,
+//             infix: None,
+//             precedence: Precedence::None,
+//         },
+//     ),
+//     (
+//         TokenType::EqualEqual,
+//         ParseRule {
+//             prefix: None,
+//             infix: None,
+//             precedence: Precedence::None,
+//         },
+//     ),
+//     (
+//         TokenType::Greater,
+//         ParseRule {
+//             prefix: None,
+//             infix: None,
+//             precedence: Precedence::None,
+//         },
+//     ),
+//     (
+//         TokenType::GreaterEqual,
+//         ParseRule {
+//             prefix: None,
+//             infix: None,
+//             precedence: Precedence::None,
+//         },
+//     ),
+//     (
+//         TokenType::Less,
+//         ParseRule {
+//             prefix: None,
+//             infix: None,
+//             precedence: Precedence::None,
+//         },
+//     ),
+//     (
+//         TokenType::LessEqual,
+//         ParseRule {
+//             prefix: None,
+//             infix: None,
+//             precedence: Precedence::None,
+//         },
+//     ),
+//     (
+//         TokenType::Identifier,
+//         ParseRule {
+//             prefix: None,
+//             infix: None,
+//             precedence: Precedence::None,
+//         },
+//     ),
+//     (
+//         TokenType::String,
+//         ParseRule {
+//             prefix: None,
+//             infix: None,
+//             precedence: Precedence::None,
+//         },
+//     ),
+//     (
+//         TokenType::Number,
+//         ParseRule {
+//             prefix: Some(Box::new(Parser::number)),
+//             infix: None,
+//             precedence: Precedence::None,
+//         },
+//     ),
+//     (
+//         TokenType::And,
+//         ParseRule {
+//             prefix: None,
+//             infix: None,
+//             precedence: Precedence::None,
+//         },
+//     ),
+//     (
+//         TokenType::Class,
+//         ParseRule {
+//             prefix: None,
+//             infix: None,
+//             precedence: Precedence::None,
+//         },
+//     ),
+//     (
+//         TokenType::Else,
+//         ParseRule {
+//             prefix: None,
+//             infix: None,
+//             precedence: Precedence::None,
+//         },
+//     ),
+//     (
+//         TokenType::False,
+//         ParseRule {
+//             prefix: None,
+//             infix: None,
+//             precedence: Precedence::None,
+//         },
+//     ),
+//     (
+//         TokenType::For,
+//         ParseRule {
+//             prefix: None,
+//             infix: None,
+//             precedence: Precedence::None,
+//         },
+//     ),
+//     (
+//         TokenType::Fun,
+//         ParseRule {
+//             prefix: None,
+//             infix: None,
+//             precedence: Precedence::None,
+//         },
+//     ),
+//     (
+//         TokenType::If,
+//         ParseRule {
+//             prefix: None,
+//             infix: None,
+//             precedence: Precedence::None,
+//         },
+//     ),
+//     (
+//         TokenType::Nil,
+//         ParseRule {
+//             prefix: None,
+//             infix: None,
+//             precedence: Precedence::None,
+//         },
+//     ),
+//     (
+//         TokenType::Or,
+//         ParseRule {
+//             prefix: None,
+//             infix: None,
+//             precedence: Precedence::None,
+//         },
+//     ),
+//     (
+//         TokenType::Print,
+//         ParseRule {
+//             prefix: None,
+//             infix: None,
+//             precedence: Precedence::None,
+//         },
+//     ),
+//     (
+//         TokenType::Return,
+//         ParseRule {
+//             prefix: None,
+//             infix: None,
+//             precedence: Precedence::None,
+//         },
+//     ),
+//     (
+//         TokenType::Super,
+//         ParseRule {
+//             prefix: None,
+//             infix: None,
+//             precedence: Precedence::None,
+//         },
+//     ),
+//     (
+//         TokenType::This,
+//         ParseRule {
+//             prefix: None,
+//             infix: None,
+//             precedence: Precedence::None,
+//         },
+//     ),
+//     (
+//         TokenType::True,
+//         ParseRule {
+//             prefix: None,
+//             infix: None,
+//             precedence: Precedence::None,
+//         },
+//     ),
+//     (
+//         TokenType::Var,
+//         ParseRule {
+//             prefix: None,
+//             infix: None,
+//             precedence: Precedence::None,
+//         },
+//     ),
+//     (
+//         TokenType::While,
+//         ParseRule {
+//             prefix: None,
+//             infix: None,
+//             precedence: Precedence::None,
+//         },
+//     ),
+//     (
+//         TokenType::Error,
+//         ParseRule {
+//             prefix: None,
+//             infix: None,
+//             precedence: Precedence::None,
+//         },
+//     ),
+//     (
+//         TokenType::EOF,
+//         ParseRule {
+//             prefix: None,
+//             infix: None,
+//             precedence: Precedence::None,
+//         },
+//     ),
+// ]);

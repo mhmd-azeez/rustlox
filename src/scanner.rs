@@ -1,3 +1,5 @@
+use num_derive::FromPrimitive;
+
 pub struct Scanner<'a> {
     source: &'a Vec<char>,
     start: usize,
@@ -21,7 +23,7 @@ impl Token {
     }
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(Debug, PartialEq, Eq, Hash, FromPrimitive)]
 pub enum TokenType {
     // Single-character tokens.
     LeftParen,
