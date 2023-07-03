@@ -1,6 +1,5 @@
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
-use std::collections::HashMap;
 
 use string_builder::Builder;
 
@@ -121,7 +120,7 @@ impl<'a> Parser<'a> {
         match result {
             Ok(value) => self.emit_constant(value),
             Err(err) => {
-                println!("Failed to parse number: {}. '{}'", err, lexeme);
+                println!("Failed to parse number: {}. '{}'", err, self.previous.lexeme);
                 panic!("Could not parse number.");
             }, 
         }

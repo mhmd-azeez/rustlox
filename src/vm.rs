@@ -1,6 +1,6 @@
 use crate::{
     chunk::{Chunk, OpCode, Value},
-    compiler::{self, compile}, debug,
+    compiler::{compile}, debug,
 };
 use num_traits::FromPrimitive;
 
