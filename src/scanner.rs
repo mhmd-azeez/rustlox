@@ -80,7 +80,7 @@ impl<'a> Scanner<'a> {
 
         let c = self.advance();
 
-        let token = match c {
+        return match c {
             '(' => self.make_token(TokenType::LeftParen),
             ')' => self.make_token(TokenType::RightParen),
             '{' => self.make_token(TokenType::LeftBrace),
@@ -123,14 +123,12 @@ impl<'a> Scanner<'a> {
             '"' => self.make_string(),
             a if self.is_alpha(a) => self.make_identifier(),
             d if self.is_digit(d) => self.make_number(),
-            _ => panic!("Invalid character"),
+            _ => self.error_token(&format!("Unexpected character: {}.", c)),
         };
-
-        return self.error_token("Unexpected character.");
     }
 
     fn is_at_end(&self) -> bool {
-        return self.current >= self.source.len();
+        return self.current >= self.source.len() - 1;
     }
 
     fn make_token(&self, token_type: TokenType) -> Token {
@@ -168,7 +166,7 @@ impl<'a> Scanner<'a> {
     }
 
     fn skip_whitespace(&mut self) {
-        loop {
+        while !self.is_at_end() {
             let c = self.peek();
             match c {
                 ' ' | '\r' | '\t' => {
