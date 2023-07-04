@@ -1,10 +1,9 @@
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 
-use string_builder::Builder;
-
 use crate::{
     chunk::{Chunk, OpCode, Value},
+    debug::disassemble_chunk,
     scanner::{Scanner, Token, TokenType},
 };
 
@@ -13,6 +12,8 @@ struct Parser<'a> {
     previous: Token,
     scanner: Scanner<'a>,
     chunk: Chunk,
+    had_error: bool,
+    panic_mode: bool,
 }
 
 #[derive(Debug, FromPrimitive)]
@@ -43,20 +44,23 @@ impl<'a> Parser<'a> {
             previous: Token::empty(),
             scanner: Scanner::new(source),
             chunk: Chunk::new(),
+            had_error: false,
+            panic_mode: false,
         };
     }
 
-    fn advance(&mut self) -> Option<String> {
+    fn advance(&mut self) {
         self.previous = self.current.clone();
 
         loop {
             self.current = self.scanner.scan_token();
 
             if self.current.token_type != TokenType::Error {
-                return None;
+                return;
             };
+
             let lexeme = &self.current.lexeme.clone();
-            return Some(self.error_at_current(lexeme));
+            self.error_at_current(lexeme)
         }
     }
 
@@ -90,37 +94,45 @@ impl<'a> Parser<'a> {
         self.emit_byte(OpCode::Return as u8);
     }
 
-    fn error_at_current(&mut self, message: &str) -> String {
-        return Parser::error_at(&self.current, message);
+    fn error_at_current(&mut self, message: &str) {
+        self.error_at(&self.current.clone(), message);
     }
 
-    fn error(&mut self, message: &str) -> String {
-        return Parser::error_at(&self.previous, message);
+    fn error(&mut self, message: &str) {
+        self.error_at(&self.previous.clone(), message);
     }
 
-    fn error_at(token: &Token, message: &str) -> String {
-        let mut builder = Builder::default();
-
-        builder.append(format!("[line {}] Error", token.line));
-
-        match token.token_type {
-            TokenType::EOF => builder.append(" at end"),
-            TokenType::Error => {} // Nothing
-            _ => builder.append(format!(" at '{}'", token.lexeme)),
+    fn error_at(&mut self, token: &Token, message: &str) {
+        if self.panic_mode {
+            return;
         }
 
-        builder.append(format!(": {}", message));
-        return builder.string().unwrap();
+        self.panic_mode = true;
+
+        eprint!("[line {}] Error", token.line);
+
+        match token.token_type {
+            TokenType::EOF => eprint!(" at end"),
+            TokenType::Error => {} // Nothing
+            _ => eprint!(" at '{}'", token.lexeme),
+        }
+
+        eprintln!(": {}", message);
+        self.had_error = true;
     }
 
     fn number(&mut self) {
+        print!("parse> number");
         let result = self.previous.lexeme.parse::<f64>();
         match result {
             Ok(value) => self.emit_constant(value),
             Err(err) => {
-                println!("Failed to parse number: {}. '{}'", err, self.previous.lexeme);
+                println!(
+                    "Failed to parse number: {}. '{}'",
+                    err, self.previous.lexeme
+                );
                 panic!("Could not parse number.");
-            }, 
+            }
         }
     }
 
@@ -135,6 +147,7 @@ impl<'a> Parser<'a> {
     }
 
     fn grouping(&mut self) {
+        println!("parse> grouping");
         self.expression();
         self.consume(
             TokenType::RightParen,
@@ -143,6 +156,7 @@ impl<'a> Parser<'a> {
     }
 
     fn unary(&mut self) {
+        println!("parse> unary");
         let operator_type = self.previous.token_type.clone();
 
         // Compile the operand.
@@ -156,6 +170,7 @@ impl<'a> Parser<'a> {
     }
 
     fn binary(&mut self) {
+        println!("parse> binary");
         let operator_type = self.previous.token_type.clone();
         let rule = get_rule(operator_type.clone());
         self.parse_precendence(Precedence::from_u8((rule.precedence as u8) + 1).unwrap());
@@ -172,6 +187,7 @@ impl<'a> Parser<'a> {
     fn parse_precendence(&mut self, precedence: Precedence) {
         self.advance();
 
+        println!("parse> parse_precendence. current: {:?}, prev: {:?}", self.current.token_type, self.previous.token_type);
         let prefix = get_rule(self.previous.token_type.clone()).prefix;
         match prefix {
             Some(f) => f(self),
@@ -195,9 +211,8 @@ impl<'a> Parser<'a> {
 pub fn compile(source: &Vec<char>) -> Option<Chunk> {
     let mut parser = Parser::new(source);
 
-    let result = parser.advance();
-    if let Some(error) = result {
-        eprintln!("{}", error);
+    parser.advance();
+    if parser.had_error {
         return None;
     }
 
@@ -206,7 +221,15 @@ pub fn compile(source: &Vec<char>) -> Option<Chunk> {
     parser.consume(TokenType::EOF, "Expect end of expression.".to_owned());
     parser.end_compiler();
 
-    return Some(parser.chunk);
+    if parser.had_error {
+        return None;
+    } else {
+        println!("code: ");
+        disassemble_chunk(&parser.chunk);
+        println!("----------------");
+
+        return Some(parser.chunk);
+    }
 }
 
 fn get_rule(token_type: TokenType) -> ParseRule {
@@ -258,12 +281,16 @@ fn get_rule(token_type: TokenType) -> ParseRule {
         },
         TokenType::Slash => ParseRule {
             prefix: None,
-            infix: Some(|p| p.binary()),
+            infix: Some(|p| {
+                p.binary();
+            }),
             precedence: Precedence::Factor,
         },
         TokenType::Star => ParseRule {
             prefix: None,
-            infix: Some(|p| p.binary()),
+            infix: Some(|p| {
+                p.binary();
+            }),
             precedence: Precedence::Factor,
         },
         TokenType::Bang => ParseRule {

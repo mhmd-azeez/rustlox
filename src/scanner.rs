@@ -148,7 +148,7 @@ impl<'a> Scanner<'a> {
     }
 
     fn is_at_end(&self) -> bool {
-        return self.current >= self.source.len() - 1;
+        return self.current >= self.source.len();
     }
 
     fn make_token(&self, token_type: TokenType) -> Token {
@@ -207,6 +207,10 @@ impl<'a> Scanner<'a> {
     }
 
     fn peek(&self) -> char {
+        if self.is_at_end() {
+            return '\0';
+        }
+
         return self.source[self.current];
     }
 
