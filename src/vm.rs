@@ -69,7 +69,9 @@ impl VM {
                         self.push(-value);
                     }
                     OpCode::Return => {
-                        debug::print_value(self.pop());
+                        if self.stack.len() > 0 {
+                            debug::print_value(self.pop());
+                        }
                         println!();
                         return InterpretResult::Ok;
                     }

@@ -77,7 +77,7 @@ fn read_line() -> Result<Vec<char>, io::Error> {
     let stdin = io::stdin();
     let mut buffer = String::new();
     stdin.lock().read_line(&mut buffer)?;
-    Ok(buffer.chars().collect())
+    Ok(buffer.trim().chars().collect())
 }
 
 fn read_file(file_path: &str) -> Result<Vec<char>, io::Error> {
