@@ -196,11 +196,9 @@ impl<'a> Scanner<'a> {
                     self.line += 1;
                     self.advance();
                 }
-                '/' => {
-                    if self.peek_next() == '/' {
-                        while self.peek() != '\n' && !self.is_at_end() {
-                            self.advance();
-                        }
+                '/' if self.peek_next() == '/' => {
+                    while self.peek() != '\n' && !self.is_at_end() {
+                        self.advance();
                     }
                 }
                 _ => return,

@@ -5,7 +5,7 @@ use string_builder::Builder;
 
 use crate::{
     chunk::{Chunk, OpCode, Value},
-    scanner::{Scanner, Token, TokenType}, debug::disassemble_instruction,
+    scanner::{Scanner, Token, TokenType},
 };
 
 struct Parser<'a> {
@@ -75,8 +75,6 @@ impl<'a> Parser<'a> {
 
     fn end_compiler(&mut self) {
         self.emit_return();
-
-        disassemble_instruction(&self.chunk, 0);
     }
 
     fn emit_byte(&mut self, byte: u8) {

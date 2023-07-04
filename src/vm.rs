@@ -1,6 +1,6 @@
 use crate::{
     chunk::{Chunk, OpCode, Value},
-    compiler::{compile}, debug,
+    compiler::{compile}, debug::{self, disassemble_chunk},
 };
 use num_traits::FromPrimitive;
 
@@ -34,6 +34,11 @@ impl VM {
     }
 
     fn run(&mut self, chunk: &Chunk) -> InterpretResult {
+
+        println!("code: ");
+        disassemble_chunk(chunk);
+        println!("----------------");
+
         loop {
             print!("          ");
 
