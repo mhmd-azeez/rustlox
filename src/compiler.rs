@@ -122,7 +122,6 @@ impl<'a> Parser<'a> {
     }
 
     fn number(&mut self) {
-        print!("parse> number");
         let result = self.previous.lexeme.parse::<f64>();
         match result {
             Ok(value) => self.emit_constant(value),
@@ -147,7 +146,6 @@ impl<'a> Parser<'a> {
     }
 
     fn grouping(&mut self) {
-        println!("parse> grouping");
         self.expression();
         self.consume(
             TokenType::RightParen,
@@ -156,7 +154,6 @@ impl<'a> Parser<'a> {
     }
 
     fn unary(&mut self) {
-        println!("parse> unary");
         let operator_type = self.previous.token_type.clone();
 
         // Compile the operand.
@@ -170,7 +167,7 @@ impl<'a> Parser<'a> {
     }
 
     fn binary(&mut self) {
-        println!("parse> binary");
+
         let operator_type = self.previous.token_type.clone();
         let rule = get_rule(operator_type.clone());
         self.parse_precendence(Precedence::from_u8((rule.precedence as u8) + 1).unwrap());
@@ -187,7 +184,6 @@ impl<'a> Parser<'a> {
     fn parse_precendence(&mut self, precedence: Precedence) {
         self.advance();
 
-        println!("parse> parse_precendence. current: {:?}, prev: {:?}", self.current.token_type, self.previous.token_type);
         let prefix = get_rule(self.previous.token_type.clone()).prefix;
         match prefix {
             Some(f) => f(self),
